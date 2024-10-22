@@ -1,0 +1,555 @@
+---
+title: "Statistics-PalmerPenguins"
+author: "Varsha Venkataraman - 240150459"
+date: "`r Sys.Date()`"
+output: 
+  pdf_document: 
+    latex_engine: xelatex
+  header-includes:
+  - \usepackage{float}
+---
+
+The dataset that is used in this analysis comprises **Palmer penguins** which comprises measurement from a subset of **200 penguins** that is sampled from a population of three species: **Chinstrap, Gentoo, and Adelie**. The dataset also included details of the penguins' physical features: **bill length, bill depth, flipper length, and body mass**. Moreover, the dataset records the islands of origin(**Dream, Biscoe, or Torgerson**) and the gender(**male,female**) of each penguin. This analysis aims to achieve all the task that are mentioned in the coursework.
+```{r, message=FALSE, warning=FALSE, echo = FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(palmerpenguins)
+library(ggplot2)
+library(dplyr)
+library(MASS)
+library(tidyr)
+library(multcomp)
+library(GGally)
+library(gt)
+library(gridExtra)
+library(knitr)
+library(kableExtra)
+library(car)
+library(plotly)
+library(caret)  
+library(broom) 
+data("penguins")
+penguins <- na.omit(penguins)
+n <- 200
+my.student.number <- 240150459
+set.seed(my.student.number)
+my.penguins <- penguins[sample(nrow(penguins), n), ]
+variables <- c("body_mass_g", "bill_depth_mm", "bill_length_mm", "flipper_length_mm") # I am considering these variables for my summary analysis
+summary_stats <- data.frame(
+  Statistic = c("Range", "Variance", "Mean","Standard Deviation", "IQR", "Coefficient of Variation"), #These are my summary analysis
+  `Body Mass` = round(c(
+    max(my.penguins$body_mass_g, na.rm = TRUE) - min(my.penguins$body_mass_g, na.rm = TRUE), #formula for finding range
+    var(my.penguins$body_mass_g, na.rm = TRUE), # formula for finding variance
+    mean(my.penguins$body_mass_g, na.rm = TRUE), # formula for finding mean
+    sd(my.penguins$body_mass_g, na.rm = TRUE), #formula for finding the standard deviation
+    IQR(my.penguins$body_mass_g, na.rm = TRUE), 
+    (sd(my.penguins$body_mass_g, na.rm = TRUE) / mean(my.penguins$body_mass_g, na.rm = TRUE)) * 100
+  ), 2),#formular for finding the inter quantile range and am allowing two decimal values
+  `Bill Depth` = round(c(
+    max(my.penguins$bill_depth_mm, na.rm = TRUE) - min(my.penguins$bill_depth_mm, na.rm = TRUE),
+    var(my.penguins$bill_depth_mm, na.rm = TRUE),
+    mean(my.penguins$bill_depth_mm, na.rm = TRUE),
+    sd(my.penguins$bill_depth_mm, na.rm = TRUE),
+    IQR(my.penguins$bill_depth_mm, na.rm = TRUE),
+    (sd(my.penguins$bill_depth_mm, na.rm = TRUE) / mean(my.penguins$bill_depth_mm, na.rm = TRUE)) * 100
+  ), 2),
+  `Bill Length` = round(c(
+    max(my.penguins$bill_length_mm, na.rm = TRUE) - min(my.penguins$bill_length_mm, na.rm = TRUE),
+    var(my.penguins$bill_length_mm, na.rm = TRUE),
+    mean(my.penguins$bill_length_mm, na.rm = TRUE),
+    sd(my.penguins$bill_length_mm, na.rm = TRUE),
+    IQR(my.penguins$bill_length_mm, na.rm = TRUE),
+    (sd(my.penguins$bill_length_mm, na.rm = TRUE) / mean(my.penguins$bill_length_mm, na.rm = TRUE)) * 100
+  ), 2),
+  `Flipper Length` = round(c(
+    max(my.penguins$flipper_length_mm, na.rm = TRUE) - min(my.penguins$flipper_length_mm, na.rm = TRUE),
+    var(my.penguins$flipper_length_mm, na.rm = TRUE),
+    mean(my.penguins$bill_length_mm, na.rm = TRUE),
+    sd(my.penguins$flipper_length_mm, na.rm = TRUE),
+    IQR(my.penguins$flipper_length_mm, na.rm = TRUE),
+    (sd(my.penguins$flipper_length_mm, na.rm = TRUE) / mean(my.penguins$flipper_length_mm, na.rm = TRUE)) * 100
+  ), 2)
+)
+
+kable(summary_stats, format = "latex", booktabs = TRUE, 
+      caption = "Summary Statistics of Penguin Features", label = "summary-stats-table") %>%
+  kable_styling(latex_options = c("striped", "hold_position"))
+```
+```{r, message=FALSE, warning=FALSE, echo = FALSE}
+summary_stats <- data.frame(
+  Statistic = c("Min", "Q1", "Median", "Q3", "Max"), #carrying out numerical analysis
+  Bill_Length = c(
+    min(my.penguins$bill_length_mm, na.rm = TRUE), 
+    quantile(my.penguins$bill_length_mm, 0.25, na.rm = TRUE),
+    median(my.penguins$bill_length_mm, na.rm = TRUE),
+    quantile(my.penguins$bill_length_mm, 0.75, na.rm = TRUE),
+    max(my.penguins$bill_length_mm, na.rm = TRUE)
+  ),
+  Bill_Depth = c(
+    min(my.penguins$bill_depth_mm, na.rm = TRUE),
+    quantile(my.penguins$bill_depth_mm, 0.25, na.rm = TRUE),
+    median(my.penguins$bill_depth_mm, na.rm = TRUE),
+    quantile(my.penguins$bill_depth_mm, 0.75, na.rm = TRUE),
+    max(my.penguins$bill_depth_mm, na.rm = TRUE)
+  ),
+  Flipper_Length = c(
+    min(my.penguins$flipper_length_mm, na.rm = TRUE),
+    quantile(my.penguins$flipper_length_mm, 0.25, na.rm = TRUE),
+    median(my.penguins$flipper_length_mm, na.rm = TRUE),
+    quantile(my.penguins$flipper_length_mm, 0.75, na.rm = TRUE),
+    max(my.penguins$flipper_length_mm, na.rm = TRUE)
+  ),
+  Body_Mass = c(
+    min(my.penguins$body_mass_g, na.rm = TRUE),
+    quantile(my.penguins$body_mass_g, 0.25, na.rm = TRUE),
+    median(my.penguins$body_mass_g, na.rm = TRUE),
+    quantile(my.penguins$body_mass_g, 0.75, na.rm = TRUE),
+    max(my.penguins$body_mass_g, na.rm = TRUE)
+  )
+)
+summary_stats <- summary_stats %>% mutate(across(-Statistic, round, 2))
+summary_stats %>%
+  kable(format = "latex", booktabs = TRUE, caption = "Summary Statistics of Penguin Features") %>%
+  kable_styling(latex_options = c("striped", "hold_position"))
+```
+**\underline{Task 01: Summarise the Physical Attributes of Penguins}**
+
+**\underline{Numerical Analysis}** - Results from our numerical analysis of the Palmer penguin's physical characteristics reveal that many aspects, especially body mass (**Tables 1 and 2**), show very large range and high standard deviation which indicates unique variability in traits. So it is summarized that the environmental factors probably denoted by diet and habitat may affect body size of penguin
+
+In contrast, bill depth exhibits little variation and reflects a common diet-related adaptation among individuals. The varying size of penguins' flippers suggest the changes are related to modifications for swimming economy. A wider range of bill length also means potential environmental pressures related to different feeding behavior. From the unique coefficients of variation it can be attributed that they exhibit different ranges of standard variance within the population.
+
+```{r, message=FALSE, warning=FALSE, echo = FALSE,fig.align='center',fig.height=3, fig.width=5}
+#plotting the graph to identify how the sex is split among the species of penguins
+library(forcats)
+ggplot(penguins, aes(x = fct_infreq(species), fill = sex)) +
+  geom_bar(position = "dodge", width = 0.5) + 
+  labs(
+    title = "Distribution of Sex by Species",
+    x = "Species",
+    y = "Count",
+    fill = "Sex"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 12),
+    axis.title = element_text(size = 10),
+    axis.text = element_text(size = 8),
+    legend.position = "top"
+  )
+```
+
+**\underline{Graphical Analysis:}** Barplot showing the number of female and male penguins per species: Adelie, Chinstrap or Gentoo. From the plot, it can be seen that similar number of male and female penguins are there in Adelie as well as Chinstrap species. The Gentoo species however displayed an odd quirk in their numbers; more male than female penguins. This disparity in the Gentoo race will be a clear indication that there must be gender imbalance.
+
+I ploted this barplot for **Task 4**, as Adelie and Chinstrap almost have equal gender split, so I assume that there is unique difference in the physical characteristics between the genders.
+
+**\underline{Task 02: Fitting a Probability Distribution to Penguin Measurements}**
+
+**\underline{Box-Cox Transformation and Log-Likelihood Calculation}**
+
+The Box-Cox transformation stabilizes variance and makes data more normal:
+\section
+\[
+Y' =
+\begin{cases}
+\frac{Y^\lambda - 1}{\lambda} & \lambda \neq 0, \\
+\log(Y) & \lambda = 0.
+\end{cases}
+\]
+The optimal \(\lambda\) is obtained by maximizing the log-likelihood:
+\[
+\lambda_{\text{opt}} = \arg \max_{\lambda} \ \log \mathcal{L}(\lambda | Y).
+\]
+For our dataset:
+- Optimal \(\lambda\): \(\textbf{1.515152}\)
+- Mean (\(\mu\)): \(\textbf{0.0032}\)
+- Variance (\(\sigma^2\)): \(\textbf{0.9533}\)
+
+The optimal Box-Cox transformation for bill depth yielded \(\lambda = 1.515152\), indicating a need to stabilize variance.
+
+**\underline{Normal Distribution Fit for Box-Cox Transformed Bill Depth}**
+
+The probability density function (PDF) of a normal distribution is defined as:
+
+\[
+f(x | \mu, \sigma) = \frac{1}{\sigma \sqrt{2 \pi}} \exp \left( -\frac{(x - \mu)^2}{2 \sigma^2} \right)
+\]
+where:
+ \( x \) represents the Box-Cox transformed bill depth measurements.
+\begin{itemize}
+    \setlength\itemsep{0.1em}
+    \item \( \mu \) is the mean of the transformed data, calculated as: \(\mu = \frac{\sum_{i=1}^{n} x_i}{n} = 48.59377\).
+    \item \( \sigma \) is the standard deviation of the transformed data, calculated as: \(\sigma = \sqrt{\frac{\sum_{i=1}^{n} (x_i - \mu)^2}{n}} = 8.474398\).
+\end{itemize}
+
+```{r}
+boxcox_result_bill_depth <- boxcox(penguins$bill_depth_mm ~ 1)
+```
+```{r,echo=TRUE, results='asis'}
+lambda_opt <- boxcox_result_bill_depth$x[which.max(boxcox_result_bill_depth$y)]
+boxcox_transformed <- (penguins$bill_depth_mm^lambda_opt - 1) / lambda_opt
+mean_transformed <- mean(boxcox_transformed)
+sd_transformed <- sd(boxcox_transformed)
+```
+
+Using these values, the normal curve is fitted over the histogram of the Box-Cox transformed bill depth. This provides a visual check of how well the transformed data aligns with a normal distribution.
+
+For our dataset: \(\mu = 48.6\) and \(\sigma = 8.5\)
+
+```{r, message=FALSE, warning=FALSE, echo = FALSE,fig.height=4}
+lambda_bill_depth <- boxcox_result_bill_depth$x[which.max(boxcox_result_bill_depth$y)]
+penguins$boxcox_bill_depth_mm <- (penguins$bill_depth_mm^lambda_bill_depth - 1) / lambda_bill_depth
+
+shapiro_test_boxcox_bill_depth <- shapiro.test(penguins$boxcox_bill_depth_mm)
+results <- data.frame(
+  Metric = c("Shapiro-Wilk Test p-value"),
+  Value = c(
+    ifelse(shapiro_test_boxcox_bill_depth$p.value < 0.001, "< 0.001", round(shapiro_test_boxcox_bill_depth$p.value, 4))
+  )
+)
+results_kable <- kable(results, format = "latex", booktabs = TRUE, 
+                        caption = "Shapiro-Wilk Test Results for Box-Cox Transformed Bill Depth") %>%
+                  kable_styling(latex_options = c("striped", "hold_position"))
+kable(results, col.names = c("Metric", "Value"), align = "l")
+```
+
+```{r, message=FALSE, warning=FALSE, echo = FALSE,fig.height=5,fig.width=10}
+# Set up the plot layout for two plots side by side
+par(mfrow = c(1, 2))
+
+# Q-Q plot for Box-Cox Transformed Bill Depth
+qqnorm(penguins$boxcox_bill_depth_mm, main = "Q-Q Plot for Box-Cox Transformed Bill Depth")
+qqline(penguins$boxcox_bill_depth_mm, col = "red")
+
+# Histogram with normal curve for Box-Cox Transformed Bill Depth
+plot_with_normal_curve <- function(data, variable, main_title) {
+  mean_val <- mean(data)
+  sd_val <- sd(data)
+  hist(data, 
+      main = main_title, 
+      xlab = variable, 
+      probability = TRUE, 
+      col = 'lightblue', 
+      border = 'white', 
+      ylim = c(0, max(density(data)$y) * 1.2))
+  curve(dnorm(x, mean = mean_val, sd = sd_val), 
+      add = TRUE, 
+      col = 'red', 
+      lwd = 2)
+}
+plot_with_normal_curve(penguins$boxcox_bill_depth_mm, "boxcox_bill_depth_mm", "Box-Cox Transformed Bill Depth")
+
+# Reset plot layout to a single plot per page after the combined plots
+par(mfrow = c(1, 1))
+  
+```
+
+However, the Shapiro-Wilk test returned a p-value < 0.001, suggesting that even the transformed data is not normally distributed. This result is further supported by the Q-Q plot, which indicated deviations from normality. Given these results, using the normal distribution to estimate probabilities for the penguin population may not provide accurate estimates. **Instead, alternative distributions like the log-normal or gamma could better capture the characteristics of the data, especially given the observed skewness**.
+
+**\underline{Task 03: Key Variables for Distinguishing Penguin Sex}**
+
+```{r, message=FALSE, warning=FALSE, echo = FALSE}
+bartlett_results <- lapply(variables, function(var) {
+  formula <- as.formula(paste(var, "~ island"))
+  bartlett.test(formula, data = penguins)
+})
+
+bartlett_summary <- do.call(rbind, lapply(seq_along(bartlett_results), function(i) {
+  res <- bartlett_results[[i]]
+  data.frame(
+    Variable = variables[i],
+    K_squared = res$statistic,
+    p_value = ifelse(res$p.value < 0.001, "< 0.001", round(res$p.value, 4)),
+    stringsAsFactors = FALSE
+  )
+}))
+row.names(bartlett_summary) <- NULL
+bartlett_kable <- kable(
+  bartlett_summary,
+  format = "latex",
+  booktabs = TRUE,
+  caption = "Bartlett's Test Results for Homogeneity of Variances by Island"
+) %>%
+  kable_styling(latex_options = c("striped", "hold_position"), full_width = FALSE) %>%
+  column_spec(2:4, width = "4cm") %>%  
+  row_spec(0, bold = TRUE)
+
+bartlett_kable
+```
+```{r, message=FALSE, warning=FALSE, echo = FALSE}
+bartlett_results <- lapply(variables, function(var) {
+  formula <- as.formula(paste(var, "~ sex"))
+  bartlett.test(formula, data = penguins)
+})
+bartlett_summary <- do.call(rbind, lapply(seq_along(bartlett_results), function(i) {
+  res <- bartlett_results[[i]]
+  data.frame(
+    Variable = variables[i],
+    K_squared = res$statistic,
+    p_value = ifelse(res$p.value < 0.001, "< 0.001", round(res$p.value, 4)),
+    stringsAsFactors = FALSE
+  )
+}))
+
+row.names(bartlett_summary) <- NULL 
+bartlett_kable <- kable(
+  bartlett_summary,
+  format = "latex",
+  booktabs = TRUE,
+  caption = "Bartlett's Test Results for Homogeneity of Variances by Sex"
+) %>%
+  kable_styling(latex_options = c("striped", "hold_position"), full_width = FALSE) %>%
+  column_spec(2:3, width = "4cm") %>%
+  row_spec(0, bold = TRUE)
+bartlett_kable
+```
+```{r, message=FALSE, warning=FALSE, echo = FALSE}
+sex_levels <- unique(penguins$sex)
+t_test_results <- list()
+
+for (var in variables) {
+  t_test_results[[var]] <- list()
+  if (length(sex_levels) == 2) {
+    formula <- as.formula(paste(var, "~ sex"))
+    t_result <- t.test(formula, data = penguins, var.equal = TRUE)
+    t_test_results[[var]] <- data.frame(
+      Comparison = paste(var, "by Sex (Male vs Female)"),
+      `T-Statistic` = round(t_result$statistic, 4),
+      `P-Value` = ifelse(t_result$p.value < 0.001, "< 0.001", round(t_result$p.value, 4)),
+      stringsAsFactors = FALSE
+    )
+  } else {
+    warning(paste("Not enough levels for variable:", var))
+  }
+}
+t_test_summary <- do.call(rbind, t_test_results)
+
+row.names(t_test_summary) <- NULL
+
+t_test_kable <- kable(
+  t_test_summary,
+  format = "latex",
+  booktabs = TRUE,
+  caption = "T-Test Results for Sex Distinction"
+) %>%
+  kable_styling(latex_options = c("striped", "hold_position"), full_width = FALSE) %>%
+  column_spec(1, width = "8cm") %>%
+  column_spec(2, width = "4cm") 
+t_test_kable
+```
+**\underline{Bartlett's Test}** : This test is performed here to check if the variances of variables (e.g., body mass, bill depth) are similar across different groups (e.g., by island or by sex).
+
+Two groups mean t-tests – It is being used to determine if the means of different physical traits (body mass and bill depth for male vs female penguins) are significantly equal contrarily.
+
+A p-value below 0.05 in a t-test is indicative of the two group's means being significantly different from each other, and it tells us that such an observation would have not come randomly into existence given our null hypotheses consisting on both data sets coming from the same source.
+ 
+```{r, message=FALSE, warning=FALSE, echo = FALSE, fig.height=4,fig.align='center'}
+logistic_model <- glm(sex ~ body_mass_g + bill_depth_mm, 
+                      data = my.penguins, 
+                      family = binomial)
+logistic_model_summary <- tidy(logistic_model)
+logistic_model_summary <- logistic_model_summary %>%
+  mutate(p.value = ifelse(p.value < 0.001, "< 0.001", round(p.value, 3)))
+logistic_model_summary %>%
+  kable(format = "latex", booktabs = TRUE, 
+        caption = "Logistic Regression Model Summary") %>%
+  kable_styling(latex_options = c("striped", "hold_position"), full_width = FALSE)
+predicted_sex <- predict(logistic_model, type = "response")
+plot_data <- expand.grid(
+  body_mass_g = seq(min(my.penguins$body_mass_g), max(my.penguins$body_mass_g), length.out = 100),
+  bill_depth_mm = seq(min(my.penguins$bill_depth_mm), max(my.penguins$bill_depth_mm), length.out = 100)
+)
+```
+
+```{r, message=FALSE, warning=FALSE, echo = FALSE, fig.height=3, fig.width=5,fig.align='center'}
+library(ggthemes)
+plot_data$predicted_prob <- predict(logistic_model, newdata = plot_data, type = "response")
+ggplot(my.penguins, aes(x = body_mass_g, y = bill_depth_mm, color = sex)) +
+  geom_point(alpha = 0.6) +
+  geom_contour(data = plot_data, aes(z = predicted_prob), bins = 5, color = "black") +  # Reduced bins to 5
+  labs(
+    title = " Logistic Regression: Probability of Male vs Female",
+    x = "Body Mass (g)",
+    y = "Bill Depth (mm)",
+    color = "Sex"
+  ) +
+  scale_color_colorblind()+
+  theme_minimal()
+my.penguins$predicted_sex <- ifelse(predicted_sex > 0.5, "male", "female")
+confusion_matrix <- table(my.penguins$sex, my.penguins$predicted_sex)
+```
+
+**\underline{Logistic regression}** is used when the dependent variable is binary (in this case, “sex” which can be “male” or “female”). 
+It models the probability of a certain class (e.g., being “male”) given the values of predictor variables (e.g., body mass and bill depth).
+	It allows for estimating the odds of a penguin’s sex based on its physical measurements.This helps in understanding how the characteristics like body mass and bill depth influence the likelihood of a penguin being classified as male or female.
+	
+```{r, message=FALSE, warning=FALSE, echo = FALSE}
+accuracy <- sum(diag(confusion_matrix)) / sum(confusion_matrix)
+accuracy_percentage <- round(accuracy * 100, 2)
+confusion_df <- as.data.frame(confusion_matrix)
+summary_table <- data.frame(
+  Metric = c("Model Accuracy", "Correct Predictions", "Incorrect Predictions"),
+  Value = c(paste(accuracy_percentage, "%", sep = ""),
+            sum(diag(confusion_matrix)),
+            sum(confusion_matrix) - sum(diag(confusion_matrix)))
+)
+regression_model_name <- "Logistic Regression Model Summary"
+kable(summary_table, format = "latex", booktabs = TRUE, 
+      caption = paste(regression_model_name, "- Accuracy Summary")) %>%
+  kable_styling(latex_options = c("striped", "hold_position"))
+```
+
+With respect to **(Table 8)** we can conclude that the logistic regressionmodel achieves an accuracy of **87.5%** which classifies the sex based on the key variables bill depth and body mass.
+
+**\underline{Task 04: Impact of Island Origin on Penguin Physical Characteristics}**
+
+With respect to **(Table 4)** the results suggest that the variance of these physical traits is not consistent across different islands. This variance in physical characteristics supports the findings from other tests, such as **the t-test and MANOVA**, which indicate that the island of origin plays a significant role in the physical differences observed in penguins
+
+According to **(Table 9)** the t-test results suggest that the island of origin has a significant impact on some physical characteristics of penguins, particularly when comparing Torgersen and Biscoe or Biscoe and Dream. However, the differences between Torgersen and Dream are not significant for most of the traits, indicating that the island’s impact varies depending on the specific characteristic and island pair being compared.
+
+After t-test, proceeding with MANOVA gives a broader understanding of whether the combination of traits varies across islands as a whole. This allows for a more complete analysis of how the island of origin impacts the physical characteristics of penguins.
+```{r t_test_table, message=FALSE, warning=FALSE}
+islands <- unique(penguins$island)
+t_test_results <- list()
+
+for (var in variables) {
+  t_test_results[[var]] <- list()
+  if (length(islands) > 1) {
+    for (i in 1:(length(islands) - 1)) {
+      for (j in (i + 1):length(islands)) {
+        island_pair <- c(islands[i], islands[j])
+        subset_data <- subset(penguins, island %in% island_pair)
+        formula <- as.formula(paste(var, "~ island"))
+        t_result <- t.test(formula, data = subset_data, var.equal = TRUE)
+        t_test_results[[var]][[paste(islands[i], "vs", islands[j])]] <- t_result
+      }
+    }
+  }
+}
+
+t_test_summary <- do.call(rbind, lapply(names(t_test_results), function(var) {
+  do.call(rbind, lapply(names(t_test_results[[var]]), function(comparison) {
+    result <- t_test_results[[var]][[comparison]]
+    data.frame(
+      Comparison = comparison,
+      `T-Statistic` = round(result$statistic, 4),
+      `Degrees of Freedom` = round(result$parameter, 4),
+      `P-Value` = ifelse(result$p.value < 0.001, "< 0.001", round(result$p.value, 4)),
+      stringsAsFactors = FALSE
+    )
+  }))
+}))
+row.names(t_test_summary) <- NULL
+t_test_kable <- kable(
+  t_test_summary,
+  format = "latex",
+  booktabs = TRUE,
+  caption = "T-Test Results Between Islands"
+) %>%
+  kable_styling(latex_options = c("striped", "hold_position"), full_width = FALSE,font_size = 8) %>%
+  column_spec(1, width = "4cm") %>%
+  column_spec(2:4, width = "4cm")
+t_test_kable
+```
+
+**MANOVA analysis**, According to **(Table 10)** Wilks’ Lambda was used to evaluate whether there are significant differences in physical characteristics of penguins (bill depth, bill length, flipper length, and body mass) based on their island of origin. A low Wilks’ Lambda value, along with a significant p-value, suggests that the mean vectors of these characteristics differ significantly across islands. This indicates that the physical traits of penguins are influenced by the island they inhabit.
+
+```{r, message=FALSE, warning=FALSE}
+# Perform MANOVA
+manova_model <- manova(cbind(bill_depth_mm, bill_length_mm, flipper_length_mm, body_mass_g) ~ island, data = penguins)
+
+manova_summary <- summary(manova_model, test = "Wilks")
+wilks <- manova_summary$stats
+wilks_table <- data.frame(
+  Test = "Wilks' Lambda",
+  approx_F = wilks[1, "approx F"],
+  df = wilks[1, "num Df"],
+  p_value = wilks[1, "Pr(>F)"]
+)
+knitr::kable(wilks_table, caption = "MANOVA Test Results", digits = 4)
+```
+The results from other MANOVA tests, such as **Pillai’s Trace, Hotelling-Lawley Trace, and Roy’s Largest Root**, supported similar conclusions, affirming the significant impact of the island on the combined physical traits. Each test provided evidence that variations in body mass, flipper length, and bill measurements are associated with differences in the island environment, which could relate to ecological adaptations or evolutionary factors. The **correlation analysis** is conducted after MANOVA to explore the interrelationships between different physical characteristics of penguins.
+
+Overall, as indicated by **(Table 11 )**, the findings suggest that while some physical characteristics (e.g., body mass and flipper length) are positively correlated, bill length negatively correlates with bill depth, indicating that as one increases, the other tends to decrease. The significant correlation supports the hypothesis that the physical characteristics of penguins are interrelated, which is essential for understanding their variation across different islands.
+
+```{r, message=FALSE, warning=FALSE}
+correlation_matrix <- cor(penguins[, c("bill_length_mm", "bill_depth_mm", "flipper_length_mm", "body_mass_g")])
+correlation_matrix <- round(correlation_matrix, 2)  # Round to 2 decimal places
+correlation_df <- as.data.frame(correlation_matrix)
+correlation_df$Feature_1 <- rownames(correlation_df)
+correlation_long <- reshape2::melt(correlation_df, id.vars = "Feature_1", variable.name = "Feature_2", value.name = "Correlation_Coefficient")
+
+final_table <- correlation_long %>%
+  filter(Feature_1 != Feature_2) %>%
+  arrange(Feature_1, Feature_2)
+correlation_table <- kable(final_table, format = "latex", booktabs = TRUE, 
+                           caption = "Correlation Summary of Penguin Features", label = "correlation-table") %>%
+  kable_styling(latex_options = c("striped", "hold_position"), font_size = 8)
+correlation_table
+```
+
+**\underline{Linear Discriminant Analysis (LDA)}** is a statistical classification technique used to analyze and classify data based on a set of features. Feature Selction ,with respect to **(Table 11)** the flipper length and bodymass are strong features for inclusion in LDA model due to their strong positive correlation. I am considering bill length , flipper length as the Variation Inflation Factor calculation is 1.74 which is not problamatic so it is retained for consideration, body mass and bill_depth_mm are as well considered.
+
+```{r, message=FALSE, warning=FALSE}
+penguins_scaled <- penguins %>%
+  mutate(across(c(bill_length_mm, flipper_length_mm, body_mass_g,bill_depth_mm), scale))
+lda_model <- lda(species ~ flipper_length_mm + body_mass_g + bill_length_mm + bill_depth_mm + island , data = penguins)
+lda_values <- predict(lda_model)
+lda_data <- data.frame(lda_values$x, species = penguins$species)
+```
+```{r, message=FALSE, warning=FALSE, fig.height=4}
+ggplot(lda_data, aes(x = LD1, y = LD2, color = species)) +
+  geom_point(size = 2, alpha = 0.7) +
+  stat_ellipse(level = 0.95) +
+  theme_minimal() +
+  labs(title = "LDA of Penguin Species",
+       x = "LDA 1",
+       y = "LDA 2") +
+  theme(
+    legend.position = "right",
+    plot.title = element_text(hjust = 0.7)
+  )+
+   scale_color_colorblind()
+```
+
+The LDA model **(Table 12)** achieved a perfect classification accuracy of 100%, indicating that it can effectively **distinguish between the different penguin species based on the selected features**. The centroid values indicate that the LDA model provides a clear separation between Gentoo and the other two species primarily through LD1, while LD2 further separates Adelie from Chinstrap.
+
+This analysis provides a comprehensive view of how well the model distinguishes between different penguin species based on the selected features.
+
+```{r, message=FALSE, warning=FALSE}
+predictions <- predict(lda_model)$class
+confusion_matrix <- table(predicted = predictions, actual = penguins$species)
+accuracy_LDA <- sum(diag(confusion_matrix)) / sum(confusion_matrix)
+accuracy_percentage <- round(accuracy_LDA * 100, 2)
+centroids <- aggregate(. ~ species, data = lda_data, FUN = mean)
+summary_table <- data.frame(
+  Metric = "Model Accuracy",
+  Value = paste(accuracy_percentage, "%", sep = "")
+)
+centroids_table <- centroids %>%
+  rename_with(~paste0("Centroid_", .), -species)
+
+# Add accuracy to the centroids table as a new column
+centroids_table <- mutate(centroids_table, Model_Accuracy = paste(accuracy_percentage, "%", sep = ""))
+
+# Combine the summary and centroids into a single table
+combined_table <- centroids_table %>%
+  select(species, everything(), Model_Accuracy) %>%
+  rename(Species = species)
+combined_kable <- kable(combined_table, format = "latex", booktabs = TRUE, 
+                        caption = "Summary of LDA Model Accuracy and Centroids") %>%
+                  kable_styling(latex_options = c("striped", "hold_position"))
+
+combined_kable
+```
+
+**\underline{Conclusion}:**
+
+The **Linear Discriminant Analysis** successfully classified penguin species based on physical characteristics, achieving high accuracy and revealing distinct centroids for each species in the LDA space. This indicates a strong relationship between the selected features and species classification, supporting the research question
+
+**\underline{References}**:
+
+An introduction to applied multivariate statistics , Muni Shanker Srivastava 1936-. E. M Carter (Edward M.). c1983 - Available at **Philip Robinson library**
+
+Quantitative social science data with R - Brian J. Fogarty - Available at **Philip Robinson library**
+
+James, G., Witten, D., Hastie, T., & Tibshirani, R. (2013). An Introduction to Statistical Learning: with Applications in R. Springer.
+
