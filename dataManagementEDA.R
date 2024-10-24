@@ -1,3 +1,4 @@
+library(ProjectTemplate)
 library(dplyr)
 library(nycflights13)
 data("flights")
@@ -20,3 +21,6 @@ flights |> filter(month %n% c(7 , 8 , 9))
 flights |> filter(arr_delay >=120 & dep_delay <= 0) |> View()
 
 ?flights
+
+
+flights |> distinct(year , month , day) |> filter(year %in% c(2013)) |> nrow()
